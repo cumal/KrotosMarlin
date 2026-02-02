@@ -889,6 +889,7 @@ void GcodeSuite::process_parsed_command(bool no_ok/*=false*/) {
 
       #if HAS_LEVELING
         case 420: M420(); break;                                  // M420: Enable/Disable Bed Leveling
+        case 777: M777(); break;
       #endif
 
       #if HAS_MESH

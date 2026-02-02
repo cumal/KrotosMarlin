@@ -344,6 +344,7 @@
  * M995 - Touch screen calibration for TFT display
  * M997 - Perform in-application firmware update
  * M999 - Restart after being stopped by error
+ * M777 - Hardware bed leveling
  *
  * D... - Custom Development G-code. Add hooks to "gcode_D.cpp" for developers to test features. (Requires MARLIN_DEV_MODE)
  *        D576 - Set buffer monitoring options. (Requires BUFFER_MONITORING)
@@ -1096,6 +1097,7 @@ private:
     static void M420();
     static void M420_report(const bool forReplay=true);
     static void M421();
+    static void M777();
   #endif
 
   #if ENABLED(BACKLASH_GCODE)
