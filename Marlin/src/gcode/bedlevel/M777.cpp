@@ -41,7 +41,7 @@
 // Custom parameters
 #define MAXREPETITIONS 5
 #define MAXOFFSET 0.05f // Tolerance in mm (0.05mm)
-#define Z_MOTORS_POS { { (X_BED_SIZE / 4) - 10, Y_BED_SIZE / 4 }, { (X_BED_SIZE / 4) - 10, (Y_BED_SIZE * 3) / 4 }, { (X_BED_SIZE * 3) / 4, Y_BED_SIZE / 4 }, { (X_BED_SIZE * 3) / 4, (Y_BED_SIZE * 3) / 4 } }
+#define Z_MOTORS_POS { { (X_BED_SIZE - 170) / 2 - probe.offset.x, (Y_BED_SIZE - 170) / 2 - probe.offset.y }, { (X_BED_SIZE - 170) / 2 - probe.offset.x, (Y_BED_SIZE + 170) / 2 - probe.offset.y }, { (X_BED_SIZE + 170) / 2 - probe.offset.x, (Y_BED_SIZE - 170) / 2 - probe.offset.y }, { (X_BED_SIZE + 170) / 2 - probe.offset.x, (Y_BED_SIZE + 170) / 2 - probe.offset.y } }
 
 /**
  * M777: Hardware bed leveling
@@ -180,8 +180,10 @@ void GcodeSuite::M777() {
   // Ensure probe is ready
   if (probe.deploy()) return;
 
-  gcode.process_subcommands_now(F("G28")); // Home
-  planner.synchronize();
+  if (homing_needed_error()) {
+    gcode.process_subcommands_now(F("G28")); // Home
+    planner.synchronize();
+  }
 
   int repTimes = 1;
   bool run = true;
