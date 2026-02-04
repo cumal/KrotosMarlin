@@ -163,7 +163,6 @@ float getMax(float array[]){
 
 void printDesviationSummary(float items[], float diff) {
   SERIAL_ECHOLN("Deviation summary: ", items[0], ", ", items[1], ", ", items[2], ", ", items[3]);
-  SERIAL_ECHOLN("Diff: ", diff);
 }
  
 void GcodeSuite::M777() {
@@ -215,6 +214,7 @@ void GcodeSuite::M777() {
     
     heightDiff = (getMax(motDesv) - getMin(motDesv));
     printDesviationSummary(motDesv, heightDiff);
+    SERIAL_ECHOLN("Diff: ", heightDiff, ", Iter: ", repTimes, "/", iter);
 
     if ( (abs(heightDiff) <= MAXOFFSET) || (repTimes >= iter) ) {
       run = false;
