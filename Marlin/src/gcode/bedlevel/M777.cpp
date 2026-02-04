@@ -180,10 +180,8 @@ void GcodeSuite::M777() {
   // Ensure probe is ready
   if (probe.deploy()) return;
 
-  if (homing_needed_error()) {
-    gcode.process_subcommands_now(F("G28")); // Home
-    planner.synchronize();
-  }
+  gcode.process_subcommands_now(F("G28")); // Home
+  planner.synchronize();
 
   int repTimes = 1;
   bool run = true;
