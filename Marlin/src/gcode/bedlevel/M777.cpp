@@ -40,7 +40,7 @@
 
 // Custom parameters
 #define MAXREPETITIONS 5
-#define MAXOFFSET 0.05f // Tolerance in mm (0.05mm)
+#define MAXOFFSET 0.1f // Tolerance in mm (0.05mm)
 #define Z_MOTORS_POS { { (X_BED_SIZE - 170) / 2 - probe.offset.x, (Y_BED_SIZE - 170) / 2 - probe.offset.y }, { (X_BED_SIZE - 170) / 2 - probe.offset.x, (Y_BED_SIZE + 170) / 2 - probe.offset.y }, { (X_BED_SIZE + 170) / 2 - probe.offset.x, (Y_BED_SIZE - 170) / 2 - probe.offset.y }, { (X_BED_SIZE + 170) / 2 - probe.offset.x, (Y_BED_SIZE + 170) / 2 - probe.offset.y } }
 
 /**
