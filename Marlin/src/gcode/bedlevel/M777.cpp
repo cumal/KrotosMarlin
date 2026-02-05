@@ -39,8 +39,8 @@
 #endif
 
 // Custom parameters
-#define MAXREPETITIONS 5
-#define MAXOFFSET 0.1f // Tolerance in mm (0.05mm)
+#define MAXREPETITIONS 10
+#define MAXOFFSET 0.1f // Tolerance in mm (0.1mm)
 #define Z_MOTORS_POS { { (X_BED_SIZE - 170) / 2 - probe.offset.x, (Y_BED_SIZE - 170) / 2 - probe.offset.y }, { (X_BED_SIZE - 170) / 2 - probe.offset.x, (Y_BED_SIZE + 170) / 2 - probe.offset.y }, { (X_BED_SIZE + 170) / 2 - probe.offset.x, (Y_BED_SIZE - 170) / 2 - probe.offset.y }, { (X_BED_SIZE + 170) / 2 - probe.offset.x, (Y_BED_SIZE + 170) / 2 - probe.offset.y } }
 
 /**
@@ -49,7 +49,7 @@
 
  /**
   * Y ↑
- MOTOR2                            MOTOR4
+ MOTOR1                            MOTOR3
  (0,230)           back           (230,230)
    +----------------------------------+
    |                                  |
@@ -68,7 +68,7 @@
    |                                  |
   0+----------------------------------+ → X
  (0,0)            front             (230,0)
- MOTOR1                              MOTOR3
+ MOTOR0                              MOTOR2
   */
 
 
@@ -173,7 +173,7 @@ void GcodeSuite::M777() {
     iter = MAXREPETITIONS;
   }
   SERIAL_ECHOLN("Starting HW bed leveling. R:", iter);
-  float probe_z_offset = probe.offset.z;
+  // float probe_z_offset = probe.offset.z;
   probe.offset.z = 0;
   
   // Ensure probe is ready
@@ -225,6 +225,6 @@ void GcodeSuite::M777() {
     }
   }
   probe.stow();
-  probe.offset.z = probe_z_offset;
+  // probe.offset.z = probe_z_offset;
   SERIAL_ECHOLN("Ended HW bed leveling. Diff:", heightDiff, " Reps:", repTimes);
 }
