@@ -81,16 +81,16 @@
     motion.position.set(0.0, 0.0);
     motion.sync_plan_position();
 
-    const int x_axis_home_dir = TOOL_X_HOME_DIR(motion.extruder);
+    const int x_axis_home_dir = motion.tool_x_home_dir();
 
     // Use a higher diagonal feedrate so axes move at homing speed
     const float minfr = _MIN(motion.homing_feedrate(X_AXIS), motion.homing_feedrate(Y_AXIS)),
                 fr_mm_s = HYPOT(minfr, minfr);
 
     // Set homing current to X and Y axis if defined
-    TERN_(X_HAS_HOME_CURRENT, set_homing_current(X_AXIS));
+    TERN_(X_HAS_HOME_CURRENT, motion.set_homing_current(X_AXIS));
     #if Y_HAS_HOME_CURRENT && NONE(CORE_IS_XY, MARKFORGED_XY, MARKFORGED_YX)
-      set_homing_current(Y_AXIS);
+      motion.set_homing_current(Y_AXIS);
     #endif
 
     #if ENABLED(SENSORLESS_HOMING)
@@ -105,15 +105,34 @@
       };
     #endif
 
-    motion.blocking_move_xy(1.5 * max_length(X_AXIS) * x_axis_home_dir, 1.5 * max_length(Y_AXIS) * Y_HOME_DIR, fr_mm_s);
+    // SCARA should move in angular coordinates
+    #if IS_SCARA
+      // This code is similar to Motion::do_homing_move, but for two axes at once
+
+      #if HAS_DIST_MM_ARG
+        const xyze_float_t cart_dist_mm{0};
+      #endif
+
+      abce_pos_t target = planner.get_axis_positions_mm();
+
+      target[X_AXIS] += 360 * x_axis_home_dir; // Move 360 degrees towards the endstop
+      target[Y_AXIS] += 360 * Y_HOME_DIR;      // Move 360 degrees towards the endstop
+      planner.buffer_segment(target OPTARG(HAS_DIST_MM_ARG, cart_dist_mm), fr_mm_s, motion.extruder);
+      planner.synchronize();
+
+    #else
+
+      motion.blocking_move_xy(1.5 * motion.max_axis_length(X_AXIS) * x_axis_home_dir, 1.5 * motion.max_axis_length(Y_AXIS) * Y_HOME_DIR, fr_mm_s);
+
+    #endif
 
     endstops.validate_homing_move();
 
     motion.position.set(0.0, 0.0);
 
-    TERN_(X_HAS_HOME_CURRENT, restore_homing_current(X_AXIS));
+    TERN_(X_HAS_HOME_CURRENT, motion.restore_homing_current(X_AXIS));
     #if Y_HAS_HOME_CURRENT && NONE(CORE_IS_XY, MARKFORGED_XY, MARKFORGED_YX)
-      restore_homing_current(Y_AXIS);
+      motion.restore_homing_current(Y_AXIS);
     #endif
 
     #if ENABLED(SENSORLESS_HOMING) && DISABLED(ENDSTOPS_ALWAYS_ON_DEFAULT)
@@ -153,7 +172,7 @@
       if (DEBUGGING(LEVELING)) DEBUG_POS("home_z_safely", motion.destination);
 
       // Free the active extruder for movement
-      TERN_(DUAL_X_CARRIAGE, idex_set_parked(false));
+      TERN_(DUAL_X_CARRIAGE, motion.idex_set_parked(false));
 
       TERN_(SENSORLESS_HOMING, safe_delay(500)); // Short delay needed to settle
 
@@ -264,8 +283,8 @@ void GcodeSuite::G28() {
   #if NUM_AXES
 
     #if ENABLED(DUAL_X_CARRIAGE)
-      bool IDEX_saved_duplication_state = extruder_duplication_enabled;
-      DualXMode IDEX_saved_mode = dual_x_carriage_mode;
+      bool IDEX_saved_duplication_state = motion.extruder_duplication;
+      DualXMode IDEX_saved_mode = motion.idex_mode;
     #endif
 
     motion.set_soft_endstop_loose(false);  // Reset a leftover 'loose' motion state
@@ -291,6 +310,11 @@ void GcodeSuite::G28() {
     // Potentially disable Fixed-Time Motion for homing
     TERN_(FT_MOTION, FTM_DISABLE_IN_SCOPE());
 
+    #if ENABLED(CNC_COORDINATE_SYSTEMS)
+      const int8_t old_coordinate_system = active_coordinate_system;
+      (void)select_coordinate_system(-1);
+    #endif
+
     // Always home with tool 0 active
     #if HAS_MULTI_HOTEND
       #if DISABLED(DELTA) || ENABLED(DELTA_HOME_TO_SAFE_ZONE)
@@ -304,7 +328,7 @@ void GcodeSuite::G28() {
       tool_change(0, true);
     #endif
 
-    TERN_(HAS_DUPLICATION_MODE, set_duplication_enabled(false));
+    TERN_(HAS_DUPLICATION_MODE, motion.set_extruder_duplication(false));
 
     motion.remember_feedrate_scaling_off();
 
@@ -415,27 +439,15 @@ void GcodeSuite::G28() {
       // Home X
       #if HAS_X_AXIS
         if (doX || (doY && ENABLED(CODEPENDENT_XY_HOMING) && DISABLED(HOME_Y_BEFORE_X))) {
-
           #if ENABLED(DUAL_X_CARRIAGE)
-
-            // Always home the 2nd (right) extruder first
-            motion.extruder = 1;
-            motion.homeaxis(X_AXIS);
-
-            // Remember this extruder's position for later tool change
-            inactive_extruder_x = motion.position.x;
-
-            // Home the 1st (left) extruder
-            motion.extruder = 0;
-            motion.homeaxis(X_AXIS);
-
-            // Consider the active extruder to be in its "parked" position
-            idex_set_parked();
-
+            motion.idex_home_x();
           #else
 
-            motion.homeaxis(X_AXIS);
+            #if ENABLED(SCARA) && DISABLED(HOME_Y_BEFORE_X)
+              DISABLE_AXIS_Y(); // Allow elbow to be dragged around freely during shoulder homing
+            #endif
 
+            motion.homeaxis(X_AXIS);
           #endif
         }
       #endif // HAS_X_AXIS
@@ -502,7 +514,7 @@ void GcodeSuite::G28() {
 
       motion.sync_plan_position();
 
-    #endif
+    #endif // !DELTA && !AXEL_TPARA
 
     /**
      * Preserve DXC mode across a G28 for IDEX printers in DXC_DUPLICATION_MODE.
@@ -511,31 +523,13 @@ void GcodeSuite::G28() {
      * IDEX specific commands in it.
      */
     #if ENABLED(DUAL_X_CARRIAGE)
-
-      if (idex_is_duplicating()) {
-
+      if (motion.idex_is_duplicating()) {
         TERN_(IMPROVE_HOMING_RELIABILITY, saved_motion_state = begin_slow_homing());
-
-        // Always home the 2nd (right) extruder first
-        motion.extruder = 1;
-        motion.homeaxis(X_AXIS);
-
-        // Remember this extruder's position for later tool change
-        inactive_extruder_x = motion.position.x;
-
-        // Home the 1st (left) extruder
-        motion.extruder = 0;
-        motion.homeaxis(X_AXIS);
-
-        // Consider the active extruder to be parked
-        idex_set_parked();
-
-        dual_x_carriage_mode = IDEX_saved_mode;
-        set_duplication_enabled(IDEX_saved_duplication_state);
-
+        motion.idex_home_x();
+        motion.idex_mode = IDEX_saved_mode;
+        motion.set_extruder_duplication(IDEX_saved_duplication_state);
         TERN_(IMPROVE_HOMING_RELIABILITY, end_slow_homing(saved_motion_state));
       }
-
     #endif // DUAL_X_CARRIAGE
 
     endstops.not_homing();
@@ -566,6 +560,9 @@ void GcodeSuite::G28() {
     #endif
 
     motion.restore_feedrate_and_scaling();
+
+    // Reload workspace offsets
+    TERN_(CNC_COORDINATE_SYSTEMS, (void)select_coordinate_system(old_coordinate_system));
 
     if (ENABLED(NANODLP_Z_SYNC) && (ENABLED(NANODLP_ALL_AXIS) || TERN0(HAS_Z_AXIS, doZ)))
       SERIAL_ECHOLNPGM(STR_Z_MOVE_COMP);

@@ -37,12 +37,12 @@
 
 LevelingBilinear bedlevel;
 
-xy_pos_t LevelingBilinear::grid_spacing,
-         LevelingBilinear::grid_start;
 xy_float_t LevelingBilinear::grid_factor;
+xy_pos_t   LevelingBilinear::grid_spacing,
+           LevelingBilinear::grid_start,
+           LevelingBilinear::cached_rel;
+xy_int8_t  LevelingBilinear::cached_g;
 bed_mesh_t LevelingBilinear::z_values;
-xy_pos_t LevelingBilinear::cached_rel;
-xy_int8_t LevelingBilinear::cached_g;
 
 /**
  * Extrapolate a single point from its neighbors
@@ -106,9 +106,17 @@ void LevelingBilinear::reset() {
   }
 }
 
+/**
+ * Set grid spacing and start position
+ */
 void LevelingBilinear::set_grid(const xy_pos_t& _grid_spacing, const xy_pos_t& _grid_start) {
-  grid_spacing = _grid_spacing;
-  grid_start = _grid_start;
+  #if HAS_PROUI_MESH_EDIT
+    grid_spacing.set(MESH_X_DIST, MESH_Y_DIST);
+    grid_start = mesh_min;
+  #else
+    grid_spacing = _grid_spacing;
+    grid_start = _grid_start;
+  #endif
   grid_factor = grid_spacing.reciprocal();
 }
 
@@ -181,7 +189,7 @@ void LevelingBilinear::print_leveling_grid(const bed_mesh_t* _z_values/*=nullptr
       // The requested point requires extrapolating two points beyond the mesh.
       // These values are only requested for the edges of the mesh, which are always an actual mesh point,
       // and do not require interpolation. When interpolation is not needed, this "Mesh + 2" point is
-      // cancelled out in virt_cmr and does not impact the result. Return 0.0 rather than
+      // canceled out in virt_cmr and does not impact the result. Return 0.0 rather than
       // making this function more complex by extrapolating two points.
       return 0.0;
     }
